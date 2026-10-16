@@ -1,0 +1,51 @@
+name: E2ray VPN Marketing Pack
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 10:30 UTC = 11:30 Algeria (UTC+1)
+    - cron: "30 10 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  create-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Generate daily content pack
+        run: python scripts/generate_content.py
+
+      - name: Prepare vertical video if screen recording exists
+        run: |
+          if [ -f "assets/screen-recording.mp4" ]; then
+            mkdir -p outputs
+            ffmpeg -y -i assets/screen-recording.mp4 \
+              -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,format=yuv420p" \
+              -c:v libx264 -preset veryfast -crf 23 \
+              -c:a aac -b:a 128k -movflags +faststart \
+              -t 45 outputs/e2ray-vpn-vertical.mp4
+          else
+            echo "No assets/screen-recording.mp4 found; skipping video conversion."
+          fi
+
+      - name: Upload content pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2ray-marketing-pack
+          path: outputs/
+          if-no-files-found: error
+          retention-days: 14
