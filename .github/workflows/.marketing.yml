@@ -17,43 +17,53 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Install FFmpeg and fonts
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-dejavu-core
+          mkdir -p outputs
 
-      - name: Generate daily marketing text
-        run: python scripts/create_plan.py
-
-      - name: Edit screen recording
+      - name: Create video text files
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p outputs
 
-          if [ ! -s assets/screen-recording.mp4 ]; then
-            echo "ERROR: screen-recording.mp4 is missing or empty"
-            exit 1
-          fi
+          printf '%s\n' 'NEED A VPN?' > outputs/hook.txt
+          printf '%s\n' 'Explore server options with E2ray VPN' > outputs/subtitle.txt
+
+          cat > outputs/caption.txt <<'EOF'
+          Meet E2ray VPN. Explore available server and protocol options.
+          Connection quality depends on your network and configuration.
+
+          #E2rayVPN #VPN #AndroidApps #TechTips
+          EOF
+
+      - name: Validate recording
+        run: |
+          test -s assets/screen-recording.mp4
+          ffprobe -v error \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1:nokey=1 \
+            assets/screen-recording.mp4
+
+      - name: Edit vertical video
+        shell: bash
+        run: |
+          set -euo pipefail
 
           ffmpeg -y \
             -i assets/screen-recording.mp4 \
-            -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,drawbox=x=0:y=90:w=iw:h=300:color=black@0.48:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=outputs/hook.txt:fontcolor=white:fontsize=62:line_spacing=12:borderw=3:bordercolor=black:x=(w-text_w)/2:y=145,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:textfile=outputs/subtitle.txt:fontcolor=white:fontsize=34:line_spacing=8:borderw=2:bordercolor=black:x=(w-text_w)/2:y=250,drawbox=x=0:y=ih-190:w=iw:h=190:color=black@0.42:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='E2ray VPN':fontcolor=white:fontsize=48:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-145,format=yuv420p" \
+            -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,drawbox=x=0:y=90:w=iw:h=300:color=black@0.48:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=outputs/hook.txt:fontcolor=white:fontsize=62:borderw=3:bordercolor=black:x=(w-text_w)/2:y=145,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:textfile=outputs/subtitle.txt:fontcolor=white:fontsize=34:borderw=2:bordercolor=black:x=(w-text_w)/2:y=250,drawbox=x=0:y=ih-190:w=iw:h=190:color=black@0.42:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='E2ray VPN':fontcolor=white:fontsize=48:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-145,format=yuv420p" \
+            -t 45 \
             -c:v libx264 \
             -preset veryfast \
             -crf 23 \
             -c:a aac \
             -b:a 128k \
             -movflags +faststart \
-            -t 45 \
             outputs/e2ray-vpn-tiktok.mp4
 
-      - name: Upload finished video and captions
+      - name: Upload finished video
         uses: actions/upload-artifact@v4
         with:
           name: e2ray-tiktok-video
