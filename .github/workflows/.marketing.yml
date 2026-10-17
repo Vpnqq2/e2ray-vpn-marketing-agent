@@ -1,17 +1,18 @@
-name: E2ray VPN Marketing Pack
+
+name: E2ray VPN TikTok Video Producer
 
 on:
   workflow_dispatch:
   schedule:
-    # 10:30 UTC = 11:30 Algeria (UTC+1)
     - cron: "30 10 * * *"
 
 permissions:
   contents: read
 
 jobs:
-  create-pack:
+  produce:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,31 +22,41 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install FFmpeg
+      - name: Install FFmpeg and fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
 
-      - name: Generate daily content pack
-        run: python scripts/generate_content.py
+      - name: Generate daily marketing text
+        run: python scripts/create_plan.py
 
-      - name: Prepare vertical video if screen recording exists
+      - name: Edit screen recording
+        shell: bash
         run: |
-          if [ -f "assets/screen-recording.mp4" ]; then
-            mkdir -p outputs
-            ffmpeg -y -i assets/screen-recording.mp4 \
-              -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,format=yuv420p" \
-              -c:v libx264 -preset veryfast -crf 23 \
-              -c:a aac -b:a 128k -movflags +faststart \
-              -t 45 outputs/e2ray-vpn-vertical.mp4
-          else
-            echo "No assets/screen-recording.mp4 found; skipping video conversion."
+          set -euo pipefail
+          mkdir -p outputs
+
+          if [ ! -s assets/screen-recording.mp4 ]; then
+            echo "ERROR: screen-recording.mp4 is missing or empty"
+            exit 1
           fi
 
-      - name: Upload content pack
+          ffmpeg -y \
+            -i assets/screen-recording.mp4 \
+            -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,drawbox=x=0:y=90:w=iw:h=300:color=black@0.48:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile=outputs/hook.txt:fontcolor=white:fontsize=62:line_spacing=12:borderw=3:bordercolor=black:x=(w-text_w)/2:y=145,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:textfile=outputs/subtitle.txt:fontcolor=white:fontsize=34:line_spacing=8:borderw=2:bordercolor=black:x=(w-text_w)/2:y=250,drawbox=x=0:y=ih-190:w=iw:h=190:color=black@0.42:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='E2ray VPN':fontcolor=white:fontsize=48:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h-145,format=yuv420p" \
+            -c:v libx264 \
+            -preset veryfast \
+            -crf 23 \
+            -c:a aac \
+            -b:a 128k \
+            -movflags +faststart \
+            -t 45 \
+            outputs/e2ray-vpn-tiktok.mp4
+
+      - name: Upload finished video and captions
         uses: actions/upload-artifact@v4
         with:
-          name: e2ray-marketing-pack
+          name: e2ray-tiktok-video
           path: outputs/
           if-no-files-found: error
           retention-days: 14
